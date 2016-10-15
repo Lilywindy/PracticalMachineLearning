@@ -1,0 +1,100 @@
+---
+title: "PracticalMachineLearningFinalProject"
+author: "Wanhao Chi"
+date: "October 13, 2016"
+output: html_document
+---
+# Data Process
+## 1. Read the datasets and do data cleaning
+
+
+```{r,cache=TRUE}
+### read data
+training <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"),na.strings = c("NA","#div/0!",""))
+testing <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"),na.strings = c("NA","#div/0!",""))
+### take a first look at the data
+# dimersions of the dataset
+dim(training);dim(testing)
+#list types for each attribute
+#sapply(training,class)
+# how many types in total
+#table(sapply(training,class));table(sapply(testing,class))
+# take a look at the first 2 rows of the data
+#head(training, n = 2);head(testing, n =2)
+# summarize attribute distributions
+#summary(training); summary(testing)
+### data cleaning
+# remove the first 7 columns that have nothing with the predictions
+training <- training[,-c(1:7)]
+testing <- testing[,-c(1:7)]
+# remove the columns that contain missing values
+training <- training[,colSums(is.na(training)) == 0]
+testing <- testing[,colSums(is.na(testing)) == 0]
+
+# take a look at the data again
+# dimersions of the dataset
+dim(training);dim(testing)
+
+```
+
+## 2. Create a validation dataset from the Training dataset
+
+```{r,cache=TRUE}
+set.seed(123)
+library(caret)
+validation_index <- createDataPartition(training$classe, p =0.8, list = FALSE)
+validation <- training[-validation_index,]
+training <- training[validation_index,]
+```
+
+# Model selection
+
+Since the outcome is categorical, we will use classification trees and random forests to predict it.
+
+## 1. Classification trees
+
+```{r,cache=TRUE}
+set.seed(125)
+ctrl <- trainControl(method = "cv", number = 10) # 10 fold cross-validation is used in general
+modFit_rpart <- train(classe ~ ., data= training, method = "rpart",trControl = ctrl,na.action = na.omit)
+print(modFit_rpart,digits = 3)
+library("rattle")
+fancyRpartPlot(modFit_rpart$finalModel)
+# predict outcomes using validation dataset
+predict_rpart <- predict(modFit_rpart,validation)
+confusion_rpart <- confusionMatrix(validation$classe, predict_rpart)
+confusion_rpart
+accuracy_rpart <- confusion_rpart$overall[1]
+accuracy_rpart
+
+```
+
+Therefore, the accuracy using classification tree is 0.492. The out-of-sample error rate is 0.508.
+
+## 2. random forest
+
+```{r,cache = TRUE}
+set.seed(124)
+#library("randomForest")
+ctrl <- trainControl(method = "cv", number = 5) # 5 fold cross-validation is used 
+modFit_rf <- train(classe ~ ., data= training, method = "rf",trControl = ctrl,na.action = na.omit)
+#modFit_rf <- randomForest(classe ~ ., data = training)
+print(modFit_rf, digits = 3)
+# predict outcomes using validation dataset
+predict_rf <- predict(modFit_rf, validation)
+confusion_rf <- confusionMatrix(validation$classe, predict_rf)
+confusion_rf
+accuracy_rf <- confusion_rf$overall[1]
+accuracy_rf
+```
+
+Therefore, the accuracy using random forest is 0.997, which is much better than what we got from classification tree method. The out-of-sample error for random forest method is 0.003. However, the random forest method is computationally inefficient.
+
+# Prediction on testing dataset
+
+```{r}
+prediction_testing <- predict(modFit_rf,testing)
+prediction_testing
+```
+
+
